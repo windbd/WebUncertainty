@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "web-uncertainty"
+version = "0.3.0"
+description = "WebUncertainty: dual-level uncertainty driven planning and reasoning, plus a minimal ReAct baseline, benchmarked on WebVoyager"
+readme = "README.md"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+react-web-agent = "WebUncertainty.react_agent.cli:main"
+webuncertainty-agent = "WebUncertainty.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["WebUncertainty*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"

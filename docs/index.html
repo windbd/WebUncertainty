@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebUncertainty — Dual-Level Uncertainty Driven Planning and Reasoning for Autonomous Web Agents</title>
+<meta name="description" content="WebUncertainty is a web agent framework that models uncertainty at two levels: an Analysis/Planning agent pair that switches between explicit and implicit planning as task uncertainty changes, and a Monte Carlo tree search reasoning stage (ConActU) that separates epistemic from aleatoric action uncertainty to prune hallucinated actions.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="WebUncertainty: Dual-Level Uncertainty Driven Planning and Reasoning for Autonomous Web Agent">
+<meta property="og:description" content="A web agent framework that models uncertainty in both planning and reasoning — adaptive explicit/implicit planning plus an uncertainty-aware MCTS reasoning stage (ConActU).">
+<meta property="og:image" content="https://windbd.github.io/WebUncertainty/assets/images/framework.png">
+<meta property="og:url" content="https://windbd.github.io/WebUncertainty/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%232a78d6'/%3E%3Ctext%20x='32'%20y='45'%20font-family='system-ui,sans-serif'%20font-size='34'%20font-weight='700'%20fill='white'%20text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --page:           #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --surface-2:      #ffffff;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --accent:         #2a78d6;
+    --accent-ink:     #ffffff;
+    --accent-wash:    rgba(42,120,214,0.10);
+    --good-text:      #006300;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --serious:        #ec835a;
+    --critical:       #d03b3b;
+    --ctx-1:          #dedcd4;
+    --ctx-2:          #b3b1a8;
+    --ctx-3:          #898781;
+    --shadow:         0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:           #0d0d0d;
+      --surface-1:      #1a1a19;
+      --surface-2:      #201f1e;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --accent:         #3987e5;
+      --accent-ink:     #ffffff;
+      --accent-wash:    rgba(57,135,229,0.16);
+      --good-text:      #0ca30c;
+      --good:           #0ca30c;
+      --warning:        #fab219;
+      --serious:        #ec835a;
+      --critical:       #e66767;
+      --ctx-1:          #3a3a37;
+      --ctx-2:          #5c5b57;
+      --ctx-3:          #898781;
+      --shadow:         0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --surface-2:      #201f1e;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --accent:         #3987e5;
+    --accent-ink:     #ffffff;
+    --accent-wash:    rgba(57,135,229,0.16);
+    --good-text:      #0ca30c;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --serious:        #ec835a;
+    --critical:       #e66767;
+    --ctx-1:          #3a3a37;
+    --ctx-2:          #5c5b57;
+    --ctx-3:          #898781;
+    --shadow:         0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: var(--accent); }
+  h1, h2, h3, h4 { line-height: 1.25; font-weight: 700; margin: 0 0 0.5em; }
+  p { margin: 0 0 1em; color: var(--text-secondary); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  .wrap-wide { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  .eyebrow {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; }
+
+  /* ---------- Nav ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--page) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1120px; margin: 0 auto; padding: 0 20px;
+    display: flex; align-items: center; gap: 20px; height: 56px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); text-decoration: none; margin-right: auto; }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none;
+  }
+  .nav-links { display: flex; gap: 18px; }
+  .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 600; }
+  .nav-links a:hover { color: var(--accent); }
+  .nav-icons { display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 600;
+    background: var(--surface-1);
+  }
+  .icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .theme-toggle {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-1);
+    color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .theme-toggle svg { width: 16px; height: 16px; }
+  @media (max-width: 720px) { .nav-links { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 56px 0 8px; border-top: none; text-align: center; }
+  .hero h1 { font-size: clamp(28px, 4.4vw, 44px); letter-spacing: -0.01em; margin-bottom: 14px; }
+  .hero .tagline { font-size: clamp(16px, 2vw, 19px); color: var(--text-secondary); max-width: 760px; margin: 0 auto 22px; }
+  .authors { font-size: 15px; color: var(--text-primary); max-width: 780px; margin: 0 auto 6px; }
+  .authors sup { color: var(--accent); font-weight: 700; }
+  .affiliations { font-size: 13.5px; color: var(--text-muted); margin-bottom: 26px; }
+  .cta-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 40px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px;
+    font-size: 14.5px; font-weight: 700; text-decoration: none; border: 1px solid transparent; cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-secondary { background: var(--surface-1); color: var(--text-primary); border-color: var(--border); }
+  .btn-secondary:hover { border-color: var(--text-muted); }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* ---------- Stat tiles ---------- */
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .stat-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat-value { font-size: 34px; font-weight: 800; color: var(--accent); letter-spacing: -0.01em; }
+  .stat-label { font-size: 14px; color: var(--text-primary); font-weight: 600; margin-top: 4px; }
+  .stat-delta { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+  @media (max-width: 760px) { .stat-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- Prose sections ---------- */
+  .lede { font-size: 17px; color: var(--text-secondary); max-width: 760px; }
+  .abstract-box {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 26px 28px;
+  }
+  .abstract-box p { color: var(--text-primary); margin: 0; font-size: 15.5px; }
+
+  /* ---------- Figures ---------- */
+  figure { margin: 0; }
+  figcaption { font-size: 13.5px; color: var(--text-muted); margin-top: 10px; text-align: center; }
+  .figure-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px; }
+  .figure-pair img, .framework-figure img {
+    border: 1px solid var(--border); border-radius: 12px; background: #fff;
+  }
+  .framework-figure { margin-top: 30px; }
+  @media (max-width: 720px) { .figure-pair { grid-template-columns: 1fr; } }
+
+  /* ---------- Method cards ---------- */
+  .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 30px; }
+  .method-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
+  }
+  .method-card h3 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .method-card .tag {
+    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px;
+    background: var(--accent-wash); color: var(--accent); font-weight: 800; font-size: 13px; flex: none;
+  }
+  .method-card ol { margin: 12px 0 0; padding-left: 20px; color: var(--text-secondary); font-size: 14.5px; }
+  .method-card li { margin-bottom: 8px; }
+  .method-card li b { color: var(--text-primary); }
+  @media (max-width: 720px) { .method-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- Quadrant grid ---------- */
+  .quadrant-section { margin-top: 40px; }
+  .quadrant-section h4 { font-size: 15px; margin-bottom: 4px; }
+  .quadrant-section > p { font-size: 14px; }
+  .quadrant-wrap { display: flex; gap: 10px; margin-top: 18px; }
+  .quadrant-axis-y {
+    writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: 0.03em;
+  }
+  .quadrant-col { flex: 1; }
+  .quadrant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .quadrant-axis-x { text-align: center; font-size: 12px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.03em; margin-top: 10px; }
+  .qcard {
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface-1);
+    border-top: 4px solid var(--qcolor, var(--accent));
+  }
+  .qcard .qtitle { font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+  .qcard .qcond { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--qcolor, var(--accent)); margin-bottom: 8px; }
+  .qcard .qformula {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; color: var(--text-primary);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; display: inline-block; margin-bottom: 8px;
+  }
+  .qcard p { font-size: 13px; margin: 0; }
+  @media (max-width: 640px) { .quadrant-wrap { flex-direction: column; } .quadrant-axis-y { writing-mode: horizontal-tb; transform:none; } }
+
+  /* ---------- Results ---------- */
+  .subhead { font-size: 19px; margin-top: 46px; margin-bottom: 4px; }
+  .subhead:first-of-type { margin-top: 0; }
+  .sub-note { font-size: 13.5px; color: var(--text-muted); margin-bottom: 18px; }
+
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.data-table caption { caption-side: top; text-align: left; font-size: 13px; color: var(--text-muted); padding-bottom: 8px; }
+  table.data-table th, table.data-table td {
+    padding: 8px 10px; border-bottom: 1px solid var(--gridline); text-align: right; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table th:first-child, table.data-table td:first-child { text-align: left; white-space: normal; }
+  table.data-table thead th { color: var(--text-muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.02em; border-bottom: 1px solid var(--baseline); }
+  table.data-table tbody tr.group-start td { border-top: 1px solid var(--baseline); }
+  table.data-table tr.ours td { background: var(--accent-wash); font-weight: 700; }
+  table.data-table td b { color: var(--text-primary); }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; padding: 4px 14px; background: var(--surface-1); }
+
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+  .chart-grid.single { grid-template-columns: 1fr; }
+  .chart-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 14px;
+  }
+  .chart-card h4 { font-size: 14px; margin-bottom: 2px; }
+  .chart-card .chart-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px; }
+  .chart-card svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  details.data-toggle { margin-top: 10px; }
+  details.data-toggle summary {
+    font-size: 12.5px; color: var(--accent); cursor: pointer; font-weight: 600; list-style: none;
+  }
+  details.data-toggle summary::-webkit-details-marker { display: none; }
+  details.data-toggle summary:before { content: "▸ "; }
+  details.data-toggle[open] summary:before { content: "▾ "; }
+  details.data-toggle table { margin-top: 8px; }
+  @media (max-width: 760px) { .chart-grid { grid-template-columns: 1fr; } }
+
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .baseline-line { stroke: var(--baseline); stroke-width: 1; }
+  .tick-label { fill: var(--text-muted); font-size: 9px; font-family: system-ui, sans-serif; }
+  .axis-label { fill: var(--text-muted); font-size: 10px; font-family: system-ui, sans-serif; }
+  .x-label { fill: var(--text-secondary); font-size: 9px; font-family: system-ui, sans-serif; }
+  .bar-ctx { fill: var(--ctx-3); cursor: pointer; }
+  .bar-ctx1 { fill: var(--ctx-1); cursor: pointer; }
+  .bar-ctx2 { fill: var(--ctx-2); cursor: pointer; }
+  .bar-ctx3 { fill: var(--ctx-3); cursor: pointer; }
+  .bar-accent { fill: var(--accent); cursor: pointer; }
+  .bar-value { fill: var(--accent); font-size: 11px; font-weight: 700; font-family: system-ui, sans-serif; text-anchor: middle; }
+  .dot-ctx { fill: var(--ctx-3); stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .dot-accent { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .point-label { fill: var(--text-secondary); font-size: 10px; font-family: system-ui, sans-serif; }
+  .point-label-accent { fill: var(--accent); font-size: 11px; font-weight: 700; font-family: system-ui, sans-serif; }
+  .line-path { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .line-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .line-dot-peak { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+
+  /* ---------- Tooltip ---------- */
+  #chart-tooltip {
+    position: fixed; z-index: 100; pointer-events: none; opacity: 0; transform: translate(-50%, -110%);
+    transition: opacity 0.08s ease; background: var(--text-primary); color: var(--page); border-radius: 8px;
+    padding: 7px 10px; font-size: 12px; max-width: 220px; box-shadow: var(--shadow);
+  }
+  #chart-tooltip.visible { opacity: 1; }
+  #chart-tooltip .tip-title { color: color-mix(in srgb, var(--page) 70%, transparent); font-size: 11px; margin-bottom: 2px; }
+  #chart-tooltip .tip-value { font-weight: 700; }
+
+  /* ---------- Limitations ---------- */
+  .limits-list { padding-left: 20px; color: var(--text-secondary); font-size: 15px; }
+  .limits-list li { margin-bottom: 12px; }
+
+  /* ---------- Citation ---------- */
+  .cite-box {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; position: relative;
+  }
+  .cite-box pre { margin: 0; font-size: 12.5px; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+  .copy-btn {
+    position: absolute; top: 14px; right: 14px; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 6px 12px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer;
+  }
+  .copy-btn:hover { color: var(--text-primary); }
+
+  /* ---------- Footer ---------- */
+  footer { padding: 40px 0 60px; border-top: 1px solid var(--border); }
+  footer p { font-size: 13px; color: var(--text-muted); margin: 0 0 6px; }
+  footer a { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div id="chart-tooltip" role="status" aria-live="polite">
+  <div class="tip-title" id="tip-title"></div>
+  <div class="tip-value" id="tip-value"></div>
+</div>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">W</span>
+      WebUncertainty
+    </a>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#cite">Cite</a>
+    </div>
+    <div class="nav-icons">
+      <a class="icon-btn" href="https://github.com/windbd/WebUncertainty" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38l-.01-1.49c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.17-.89-1.17-.72-.5.06-.49.06-.49.8.06 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Code
+      </a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle color theme" type="button">
+        <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div id="top"></div>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>WebUncertainty</h1>
+    <p class="tagline">Dual-level uncertainty driven planning and reasoning for autonomous web agents — an adaptive planner that switches between explicit and implicit decomposition, paired with an uncertainty-aware Monte Carlo tree search that tells "I don't know this page" apart from "there are several valid options."</p>
+
+    <p class="authors">
+      Lingfeng Zhang<sup>1</sup>, Yongan Sun<sup>1</sup>, Jinpeng Hu<sup>1</sup>, Hui Ma<sup>1</sup>, Ying Yang<sup>1</sup>,
+      Kuien Liu<sup>1,2</sup>, Zenglin Shi<sup>1,&#42;</sup>, Meng Wang<sup>1</sup>
+    </p>
+    <p class="affiliations">
+      <sup>1</sup>Hefei University of Technology &nbsp;·&nbsp; <sup>2</sup>Academy of Cyber, CETC Group &nbsp;·&nbsp;
+      <sup>&#42;</sup>Corresponding author: zenglin.shi@hfut.edu.cn
+    </p>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://aclanthology.org/2026.findings-acl.637/" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>
+        Read the paper
+      </a>
+      <a class="btn btn-secondary" href="https://github.com/windbd/WebUncertainty" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38l-.01-1.49c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.17-.89-1.17-.72-.5.06-.49.06-.49.8.06 1.22.82 1.22.82.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        View code
+      </a>
+      <a class="btn btn-secondary" href="#cite">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 6.1H3M21 12.1H3M15.1 18.1H3"></path></svg>
+        Cite
+      </a>
+    </div>
+
+  </div>
+</header>
+
+<section id="framework-teaser" style="border-top: none;">
+  <div class="wrap-wide">
+    <figure class="framework-figure" style="margin-top: 0;">
+      <img src="assets/images/framework.png" alt="WebUncertainty framework diagram: left half is Task Uncertainty-Driven Adaptive Planning (Analysis Agent estimates task uncertainty, Planning Agent switches between explicit multi-step and implicit next-step planning); right half is Action Uncertainty-Driven MCTS Reasoning (Reasoning Agent proposes actions with confidence scores, ConActU derives EU/AU, an Action Uncertainty check routes the reward through strict penalty, relaxed penalty, normal, or regenerate, an Evaluation Agent scores the result, and values are backpropagated through Selection, Expansion, Simulation and Backpropagation)." loading="eager">
+      <figcaption>The framework decouples the agent into Task Uncertainty-Driven Adaptive Planning (left) and Action Uncertainty-Driven MCTS Reasoning (right) — see <a href="#method">Method</a> below for the full walkthrough.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="abstract">
+  <div class="wrap">
+    <p class="eyebrow">Abstract</p>
+    <div class="abstract-box">
+      <p>Recent advancements in large language models (LLMs) have empowered autonomous web agents to execute natural language instructions directly on real-world webpages. However, existing agents often struggle with complex tasks involving dynamic interactions and long-horizon execution due to rigid planning strategies and hallucination-prone reasoning. To address these limitations, we propose WebUncertainty, a novel autonomous agent framework designed to tackle dual-level uncertainty in planning and reasoning. Specifically, we design a Task Uncertainty-Driven Adaptive Planning Mechanism that adaptively selects planning modes to navigate unknown environments. Furthermore, we introduce an Action Uncertainty-Driven Monte Carlo tree search (MCTS) Reasoning Mechanism. This mechanism incorporates the Confidence-induced Action Uncertainty (ConActU) strategy to quantify both aleatoric uncertainty (AU) and epistemic uncertainty (EU), thereby optimizing the search process and guiding robust decision-making. Experimental results on the WebArena and WebVoyager benchmarks demonstrate that WebUncertainty achieves superior performance compared to state-of-the-art baselines.</p>
+    </div>
+  </div>
+</section>
+
+<section id="challenge">
+  <div class="wrap">
+    <p class="eyebrow">Motivation</p>
+    <h2>Two different reasons the same agent fails</h2>
+    <p class="lede">A one-shot plan drifts out of date the moment the page does something unexpected; a step-by-step plan with no lookahead wanders into local optima. Separately, an agent that just executes whatever action an LLM proposes has no way to tell a page it doesn't understand from a page with several equally defensible next moves — so it treats both as the same kind of failure.</p>
+    <div class="figure-pair">
+      <figure>
+        <img src="assets/images/challenge_a.png" alt="Example: an agent using rigid one-shot explicit planning misses that Amazon's sidebar has no 2024 publication-year filter, while an agent using pure implicit step-by-step planning gets distracted by an unrelated recommendation and loses the global rating filter." loading="lazy">
+        <figcaption>(a) Planning uncertainty — explicit plans go stale against a dynamic page; implicit stepping loses the global goal.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/images/challenge_b.png" alt="Example: a reasoning agent hallucinates a UI element that does not exist on the page, and separately picks a plausible-looking footer link instead of the correct dropdown control." loading="lazy">
+        <figcaption>(b) Reasoning uncertainty — the agent hallucinates elements that don't exist, or picks the wrong one among several plausible ones.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap-wide">
+    <p class="eyebrow">Method</p>
+    <h2>How WebUncertainty works</h2>
+    <p class="lede">The framework keeps the two failure modes apart end to end: a <b style="color:var(--text-primary)">planning</b> stage decides how far ahead to commit before every step, and a <b style="color:var(--text-primary)">reasoning</b> stage decides, for the chosen subgoal, whether a proposed action is trustworthy enough to take. (See the framework figure near the top of the page for the full picture.)</p>
+
+    <div class="method-grid">
+      <div class="method-card">
+        <h3><span class="tag">1</span>Task uncertainty-driven adaptive planning</h3>
+        <ol>
+          <li><b>Analyze.</b> Before every step, an Analysis Agent reads the instruction, the current page, and the execution history, and returns the remaining objectives plus a task-uncertainty score <code>u_plan &isin; [0,1]</code>.</li>
+          <li><b>Branch on uncertainty.</b> If <code>u_plan &le; &delta;</code> (a familiar page), an Explicit Planner decomposes the remaining goal into a full step sequence and the agent commits to the first step — favoring long-horizon coherence.</li>
+          <li><b>Or stay reactive.</b> If <code>u_plan &gt; &delta;</code> (an unfamiliar or shifting page), an Implicit Planner proposes only the immediate next subgoal — favoring flexibility over commitment.</li>
+          <li>As the page updates, uncertainty can drop again, letting the agent swing back from reactive stepping to committed decomposition. The empirically best switch point is <code>&delta; = 0.4</code>.</li>
+        </ol>
+      </div>
+      <div class="method-card">
+        <h3><span class="tag">2</span>Action uncertainty-driven MCTS reasoning (ConActU)</h3>
+        <ol>
+          <li><b>Propose.</b> At each search leaf, a Reasoning Agent proposes <i>K</i> candidate actions together with a confidence score for each.</li>
+          <li><b>Decompose the confidence.</b> ConActU turns those scores into <b>epistemic uncertainty</b> <code>EU = 1 &minus; mean(confidence)</code> — does the model know this page at all — and <b>aleatoric uncertainty</b> <code>AU = normalized_entropy &times; mean(confidence)</code> — are several options equally defensible.</li>
+          <li><b>Search.</b> A PUCT selection rule uses each candidate's confidence as a prior alongside its running value and visit count.</li>
+          <li><b>Evaluate and modulate.</b> An Evaluation Agent scores the resulting state. A score at or above threshold <code>&tau;</code> is accepted outright; otherwise the EU/AU quadrant below decides how the failure is handled. <code>&tau; = 6</code> (of 10) works best empirically.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="quadrant-section">
+      <h4>What happens when an action scores below &tau;</h4>
+      <p>The same low score means something different depending on <em>why</em> it's low — WebUncertainty treats a confused model differently from a genuinely ambiguous page.</p>
+      <div class="quadrant-wrap">
+        <div class="quadrant-axis-y">Epistemic uncertainty (EU) — does the model know this page?</div>
+        <div class="quadrant-col">
+          <div class="quadrant-grid">
+            <div class="qcard" style="--qcolor:var(--critical)">
+              <div class="qcond">High EU · High AU</div>
+              <div class="qtitle">Chaotic state — strict penalty</div>
+              <div class="qformula">R = &minus;5</div>
+              <p>The model doesn't recognize the page <em>and</em> can't settle on an option. Prune this path hard so search never returns to it.</p>
+            </div>
+            <div class="qcard" style="--qcolor:var(--serious)">
+              <div class="qcond">High EU · Low AU</div>
+              <div class="qtitle">Likely hallucination — relaxed penalty</div>
+              <div class="qformula">R = &minus;1</div>
+              <p>Confident-looking but ungrounded — a plausible sign of a hallucinated element. Back up and explore the parent's other children.</p>
+            </div>
+            <div class="qcard" style="--qcolor:var(--good)">
+              <div class="qcond">Low EU · High AU</div>
+              <div class="qtitle">Genuine ambiguity — normal</div>
+              <div class="qformula">R = S_base</div>
+              <p>The model knows the page; it just has several defensible options. Keep the raw score and let search compare siblings.</p>
+            </div>
+            <div class="qcard" style="--qcolor:var(--warning)">
+              <div class="qcond">Low EU · Low AU</div>
+              <div class="qtitle">Confident but wrong — regenerate</div>
+              <div class="qformula">R = 0</div>
+              <p>A single, confident action that still failed &mdash; a likely deterministic error. Ask the reasoning agent for a fresh candidate set at this node.</p>
+            </div>
+          </div>
+          <div class="quadrant-axis-x">Aleatoric uncertainty (AU) — are several options equally valid? &rarr;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap-wide">
+    <p class="eyebrow">Results</p>
+    <h2>WebArena &amp; WebVoyager</h2>
+    <p class="lede">Every method below is run independently on two backbones — GPT‑4‑Turbo and Qwen‑Max — so architecture gains can be told apart from raw model capability.</p>
+
+    <div class="stat-grid" style="margin: 24px 0 40px;">
+      <div class="stat-tile">
+        <div class="stat-value">46.9%</div>
+        <div class="stat-label">Success rate on WebArena · 812 tasks · GPT‑4‑Turbo</div>
+        <div class="stat-delta">+3.8 pts over the strongest baseline, AgentOccam (43.1%)</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">65.9%</div>
+        <div class="stat-label">Success rate on WebVoyager · 129 tasks · GPT‑4‑Turbo</div>
+        <div class="stat-delta">+1.6 pts over AgentOccam (64.3%), +3.9 pts over search-based WebPilot (62.0%)</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">&minus;56%</div>
+        <div class="stat-label">Inference time vs. WebPilot · Qwen‑Max · WebVoyager</div>
+        <div class="stat-delta">63.6% SR at 351s/task, vs. WebPilot's 55.8% at 804s/task</div>
+      </div>
+    </div>
+
+    <h3 class="subhead">WebArena — 812 tasks across six domains</h3>
+    <p class="sub-note">Success rate (%), text-only accessibility-tree observations. Best result per backbone group in <b>bold</b>.</p>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Agent</th><th>Backbone</th><th>SR</th><th>Shop</th><th>Admin</th><th>GitLab</th><th>Map</th><th>Reddit</th><th>Multi</th></tr>
+        </thead>
+        <tbody>
+          <tr class="group-start"><td>WebArena-rep</td><td>GPT-4-Turbo</td><td>16.5</td><td>16.6</td><td>15.9</td><td>10.0</td><td>22.9</td><td>21.7</td><td>16.7</td></tr>
+          <tr><td>Browser Use</td><td>GPT-4-Turbo</td><td>16.9</td><td>15.0</td><td>17.6</td><td>10.6</td><td>23.9</td><td>23.6</td><td>14.6</td></tr>
+          <tr><td>Agent-E</td><td>GPT-4-Turbo</td><td>13.9</td><td>13.4</td><td>10.4</td><td>11.1</td><td>19.3</td><td>20.8</td><td>12.5</td></tr>
+          <tr><td>WebPilot</td><td>GPT-4-Turbo</td><td>37.6</td><td>41.2</td><td>43.4</td><td>33.3</td><td>37.6</td><td>37.7</td><td>16.7</td></tr>
+          <tr><td>AgentOccam</td><td>GPT-4-Turbo</td><td>43.1</td><td>40.6</td><td>45.6</td><td>37.8</td><td><b>46.8</b></td><td>61.3</td><td>14.6</td></tr>
+          <tr class="ours"><td>WebUncertainty</td><td>GPT-4-Turbo</td><td><b>46.9</b></td><td><b>47.6</b></td><td><b>49.5</b></td><td><b>40.0</b></td><td>45.9</td><td><b>67.0</b></td><td><b>18.8</b></td></tr>
+          <tr class="group-start"><td>Agent-E</td><td>Qwen-Max</td><td>14.2</td><td>12.3</td><td>9.9</td><td>12.8</td><td>17.4</td><td>23.6</td><td>14.6</td></tr>
+          <tr><td>WebPilot</td><td>Qwen-Max</td><td>34.5</td><td>40.1</td><td>33.0</td><td>29.4</td><td><b>40.4</b></td><td>36.8</td><td><b>18.8</b></td></tr>
+          <tr><td>AgentOccam</td><td>Qwen-Max</td><td>38.4</td><td>41.2</td><td><b>42.9</b></td><td>33.3</td><td>27.5</td><td>55.7</td><td>16.7</td></tr>
+          <tr class="ours"><td>WebUncertainty</td><td>Qwen-Max</td><td><b>40.1</b></td><td><b>42.8</b></td><td>38.5</td><td><b>37.8</b></td><td>38.5</td><td><b>57.5</b></td><td>10.4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub-note" style="margin-top:14px;">WebArena-rep and Browser Use were not run on the Qwen-Max backbone in this study.</p>
+
+    <h3 class="subhead">WebVoyager — 129 live-site tasks</h3>
+    <p class="sub-note">Overall success rate (%) by backbone. Hover a bar, or open “show exact values” for the numbers.</p>
+    <div class="chart-grid" id="chart-webvoyager"></div>
+
+    <h3 class="subhead">Ablation — what each mechanism contributes</h3>
+    <p class="sub-note">Qwen-Max backbone. Removing action-uncertainty awareness (reverting to plain MCTS) costs the most on both benchmarks.</p>
+    <div class="chart-grid" id="chart-ablation"></div>
+
+    <h3 class="subhead">Performance vs. cost</h3>
+    <p class="sub-note">Qwen-Max, WebVoyager. Up and to the left is better: higher success rate for less inference time per task.</p>
+    <div class="chart-grid single" id="chart-efficiency"></div>
+
+    <h3 class="subhead">Sensitivity to &delta; and &tau;</h3>
+    <p class="sub-note">Qwen-Max, WebVoyager. The framework stays above the strongest baseline (AgentOccam, 58.9%) across a wide range of both thresholds.</p>
+    <div class="chart-grid" id="chart-sensitivity"></div>
+  </div>
+</section>
+
+<section id="limitations">
+  <div class="wrap">
+    <p class="eyebrow">Limitations</p>
+    <h2>Where this doesn't help yet</h2>
+    <ul class="limits-list">
+      <li><b style="color:var(--text-primary)">Compute overhead.</b> MCTS with multi-candidate generation costs more per step than a single forward pass. WebUncertainty cuts that overhead by more than half versus WebPilot, but the remaining cost can still be too much for real-time or low-budget deployments.</li>
+      <li><b style="color:var(--text-primary)">Text-only observations.</b> The implementation reasons over accessibility trees. Pages where the meaning lives in layout or color rather than text are harder for it to interpret correctly.</li>
+      <li><b style="color:var(--text-primary)">Tuned thresholds.</b> <code>&delta;</code> and <code>&tau;</code> are set empirically and interact with how well-calibrated the backbone LLM is. Fixed values may switch planning modes badly on unusually volatile sites; adaptive tuning is future work.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="cite">
+  <div class="wrap">
+    <p class="eyebrow">Citation</p>
+    <h2>BibTeX</h2>
+    <p class="sub-note" style="margin-bottom:14px;">Published in <a href="https://aclanthology.org/2026.findings-acl.637/" target="_blank" rel="noopener">Findings of the Association for Computational Linguistics: ACL 2026</a>.</p>
+    <div class="cite-box">
+      <button class="copy-btn" id="copy-bibtex" type="button">Copy</button>
+      <pre id="bibtex-text">@inproceedings{zhang-etal-2026-webuncertainty,
+  title     = {WebUncertainty: Dual-Level Uncertainty Driven Planning and Reasoning For Autonomous Web Agent},
+  author    = {Zhang, Lingfeng and Sun, Yongan and Hu, Jinpeng and Ma, Hui and Yang, Ying and Liu, Kuien and Shi, Zenglin and Wang, Meng},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2026},
+  year      = {2026},
+  pages     = {13072--13082},
+  url       = {https://aclanthology.org/2026.findings-acl.637/}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Funded by the National Natural Science Foundation of China (No. 62472138).</p>
+    <p>Correspondence: <a href="mailto:zenglin.shi@hfut.edu.cn">zenglin.shi@hfut.edu.cn</a> &nbsp;·&nbsp; Code: <a href="https://github.com/windbd/WebUncertainty" target="_blank" rel="noopener">github.com/windbd/WebUncertainty</a></p>
+    <p>&copy; 2026 the WebUncertainty authors, Hefei University of Technology.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- Theme toggle ---------------- */
+  var root = document.documentElement;
+  var toggleBtn = document.getElementById('theme-toggle');
+  var iconSun = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>';
+  var iconMoon = '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path>';
+  function currentTheme() {
+    var stored = localStorage.getItem('wu-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function applyTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    var icon = document.getElementById('theme-icon');
+    if (icon) icon.innerHTML = theme === 'dark' ? iconSun : iconMoon;
+  }
+  applyTheme(currentTheme());
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('wu-theme', next);
+      applyTheme(next);
+    });
+  }
+
+  /* ---------------- Copy BibTeX ---------------- */
+  var copyBtn = document.getElementById('copy-bibtex');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var txt = document.getElementById('bibtex-text').textContent;
+      var done = function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(done).catch(function () { copyBtn.textContent = 'Select & copy manually'; });
+      } else {
+        copyBtn.textContent = 'Select & copy manually';
+      }
+    });
+  }
+
+  /* ---------------- Chart toolkit ---------------- */
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function txt(attrs, str) {
+    var e = el('text', attrs);
+    e.textContent = str;
+    return e;
+  }
+  function roundedTopPath(x, y, w, h, r) {
+    if (h <= 0) return '';
+    r = Math.min(r, w / 2, h);
+    return 'M' + x + ',' + (y + h) +
+      ' L' + x + ',' + (y + r) +
+      ' Q' + x + ',' + y + ' ' + (x + r) + ',' + y +
+      ' L' + (x + w - r) + ',' + y +
+      ' Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) +
+      ' L' + (x + w) + ',' + (y + h) + ' Z';
+  }
+
+  var tooltip = document.getElementById('chart-tooltip');
+  var tipTitle = document.getElementById('tip-title');
+  var tipValue = document.getElementById('tip-value');
+  function bindTip(mark, title, value) {
+    mark.setAttribute('tabindex', '0');
+    function show(clientX, clientY) {
+      tipTitle.textContent = title;
+      tipValue.textContent = value;
+      tooltip.style.left = clientX + 'px';
+      tooltip.style.top = clientY + 'px';
+      tooltip.classList.add('visible');
+    }
+    mark.addEventListener('pointermove', function (e) { show(e.clientX, e.clientY); });
+    mark.addEventListener('pointerenter', function (e) { show(e.clientX, e.clientY); });
+    mark.addEventListener('pointerleave', function () { tooltip.classList.remove('visible'); });
+    mark.addEventListener('focus', function () {
+      var r = mark.getBoundingClientRect();
+      show(r.left + r.width / 2, r.top);
+    });
+    mark.addEventListener('blur', function () { tooltip.classList.remove('visible'); });
+  }
+
+  function makeCard(container, title, sub) {
+    var card = document.createElement('div');
+    card.className = 'chart-card';
+    if (title) { var h = document.createElement('h4'); h.textContent = title; card.appendChild(h); }
+    if (sub) { var s = document.createElement('div'); s.className = 'chart-sub'; s.textContent = sub; card.appendChild(s); }
+    container.appendChild(card);
+    return card;
+  }
+  function makeSvg(card, w, h, label) {
+    var svg = el('svg', { viewBox: '0 0 ' + w + ' ' + h, role: 'img', 'aria-label': label || '', preserveAspectRatio: 'xMidYMid meet' });
+    card.appendChild(svg);
+    return svg;
+  }
+  function makeDataTable(card, headers, rows) {
+    var det = document.createElement('details');
+    det.className = 'data-toggle';
+    var sum = document.createElement('summary');
+    sum.textContent = 'Show exact values';
+    det.appendChild(sum);
+    var wrapDiv = document.createElement('div');
+    wrapDiv.className = 'table-scroll';
+    var table = document.createElement('table');
+    table.className = 'data-table';
+    var thead = document.createElement('thead');
+    var htr = document.createElement('tr');
+    headers.forEach(function (hd) { var th = document.createElement('th'); th.textContent = hd; htr.appendChild(th); });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      if (row.accent) tr.className = 'ours';
+      row.cells.forEach(function (c) { var td = document.createElement('td'); td.textContent = c; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrapDiv.appendChild(table);
+    det.appendChild(wrapDiv);
+    card.appendChild(det);
+  }
+  function makeLegend(card, items) {
+    var wrap = document.createElement('div');
+    wrap.className = 'legend';
+    items.forEach(function (it) {
+      var li = document.createElement('span');
+      li.className = 'legend-item';
+      var sw = document.createElement('span');
+      sw.className = 'legend-swatch';
+      sw.style.background = it.color;
+      li.appendChild(sw);
+      var lab = document.createElement('span');
+      lab.textContent = it.label;
+      li.appendChild(lab);
+      wrap.appendChild(li);
+    });
+    card.appendChild(wrap);
+  }
+
+  /* ---- Bar panel: single series with one emphasized bar ---- */
+  function renderBarPanel(container, opts) {
+    // opts: title, sub, bars:[{label,value,tone}], yMax, yStep, unit, ariaLabel, tableHeaders, tableRows
+    var card = makeCard(container, opts.title, opts.sub);
+    var W = 320, H = 250, mL = 30, mR = 12, mT = 16, mB = 58;
+    var plotW = W - mL - mR, plotH = H - mT - mB;
+    var svg = makeSvg(card, W, H, opts.ariaLabel);
+    var baseY = mT + plotH;
+
+    for (var v = 0; v <= opts.yMax; v += opts.yStep) {
+      var y = mT + plotH - (v / opts.yMax) * plotH;
+      svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: y, y2: y, class: 'gridline' }));
+      svg.appendChild(txt({ x: mL - 6, y: y + 3, class: 'tick-label', 'text-anchor': 'end' }, String(v)));
+    }
+    svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: baseY, y2: baseY, class: 'baseline-line' }));
+
+    var n = opts.bars.length;
+    var slot = plotW / n;
+    var barW = Math.min(26, slot * 0.58);
+    opts.bars.forEach(function (b, i) {
+      var cx = mL + slot * i + slot / 2;
+      var h = (b.value / opts.yMax) * plotH;
+      var y = baseY - h;
+      var x = cx - barW / 2;
+      var cls = 'bar-' + (b.tone || 'ctx');
+      var bar = el('path', { d: roundedTopPath(x, y, barW, h, 4), class: cls });
+      bindTip(bar, b.label, b.value.toFixed(1) + (opts.unit || '%'));
+      svg.appendChild(bar);
+      if (b.tone === 'accent') {
+        svg.appendChild(txt({ x: cx, y: y - 6, class: 'bar-value' }, b.value.toFixed(1)));
+      }
+      var lbl = txt({ x: cx, y: baseY + 12, class: 'x-label', 'text-anchor': 'end', transform: 'rotate(-34 ' + cx + ' ' + (baseY + 12) + ')' }, b.label);
+      svg.appendChild(lbl);
+    });
+
+    if (opts.tableHeaders) makeDataTable(card, opts.tableHeaders, opts.tableRows);
+  }
+
+  /* ---- Scatter panel ---- */
+  function renderScatterPanel(container, opts) {
+    var card = makeCard(container, opts.title, opts.sub);
+    var W = 640, H = 340, mL = 40, mR = 20, mT = 16, mB = 46;
+    var plotW = W - mL - mR, plotH = H - mT - mB;
+    var svg = makeSvg(card, W, H, opts.ariaLabel);
+    var sx = function (v) { return mL + (v - opts.xDomain[0]) / (opts.xDomain[1] - opts.xDomain[0]) * plotW; };
+    var sy = function (v) { return mT + plotH - (v - opts.yDomain[0]) / (opts.yDomain[1] - opts.yDomain[0]) * plotH; };
+
+    opts.yTicks.forEach(function (v) {
+      var y = sy(v);
+      svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: y, y2: y, class: 'gridline' }));
+      svg.appendChild(txt({ x: mL - 8, y: y + 3, class: 'tick-label', 'text-anchor': 'end' }, v + '%'));
+    });
+    opts.xTicks.forEach(function (v) {
+      var x = sx(v);
+      svg.appendChild(txt({ x: x, y: H - mB + 18, class: 'tick-label', 'text-anchor': 'middle' }, v + 's'));
+    });
+    svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: mT + plotH, y2: mT + plotH, class: 'baseline-line' }));
+    svg.appendChild(txt({ x: mL, y: 12, class: 'axis-label' }, 'Success rate ↑'));
+    svg.appendChild(txt({ x: W - mR, y: H - 6, class: 'axis-label', 'text-anchor': 'end' }, 'Avg. inference time / task →'));
+
+    opts.points.forEach(function (p) {
+      var cx = sx(p.x), cy = sy(p.y);
+      var r = p.accent ? 8 : 6;
+      var hit = el('circle', { cx: cx, cy: cy, r: 16, fill: 'transparent' });
+      bindTip(hit, p.label, p.y + '% SR · ' + p.x + 's/task');
+      svg.appendChild(hit);
+      svg.appendChild(el('circle', { cx: cx, cy: cy, r: r, class: p.accent ? 'dot-accent' : 'dot-ctx' }));
+      var anchor = p.anchor || 'start';
+      var dx = anchor === 'end' ? -10 : 10;
+      svg.appendChild(txt({ x: cx + dx, y: cy + (p.dy || 4), class: p.accent ? 'point-label-accent' : 'point-label', 'text-anchor': anchor }, p.label));
+    });
+
+    if (opts.tableHeaders) makeDataTable(card, opts.tableHeaders, opts.tableRows);
+  }
+
+  /* ---- Line panel (single series, categorical x) ---- */
+  function renderLinePanel(container, opts) {
+    var card = makeCard(container, opts.title, opts.sub);
+    var W = 320, H = 230, mL = 32, mR = 16, mT = 16, mB = 34;
+    var plotW = W - mL - mR, plotH = H - mT - mB;
+    var svg = makeSvg(card, W, H, opts.ariaLabel);
+    var n = opts.points.length;
+    var sx = function (i) { return mL + (plotW / (n - 1)) * i; };
+    var sy = function (v) { return mT + plotH - (v / opts.yMax) * plotH; };
+
+    for (var v = 0; v <= opts.yMax; v += opts.yStep) {
+      var y = sy(v);
+      svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: y, y2: y, class: 'gridline' }));
+      svg.appendChild(txt({ x: mL - 6, y: y + 3, class: 'tick-label', 'text-anchor': 'end' }, String(v)));
+    }
+    svg.appendChild(el('line', { x1: mL, x2: W - mR, y1: mT + plotH, y2: mT + plotH, class: 'baseline-line' }));
+
+    var d = '';
+    opts.points.forEach(function (p, i) {
+      var x = sx(i), y = sy(p.value);
+      d += (i === 0 ? 'M' : 'L') + x + ',' + y + ' ';
+      svg.appendChild(txt({ x: x, y: H - 8, class: 'tick-label', 'text-anchor': 'middle' }, p.x));
+    });
+    svg.appendChild(el('path', { d: d.trim(), class: 'line-path' }));
+
+    opts.points.forEach(function (p, i) {
+      var x = sx(i), y = sy(p.value);
+      var hit = el('circle', { cx: x, cy: y, r: 14, fill: 'transparent' });
+      bindTip(hit, opts.xLabel + ' = ' + p.x, p.value.toFixed(1) + '%');
+      svg.appendChild(hit);
+      svg.appendChild(el('circle', { cx: x, cy: y, r: p.peak ? 5 : 3.5, class: p.peak ? 'line-dot-peak' : 'line-dot' }));
+      if (p.peak) svg.appendChild(txt({ x: x, y: y - 10, class: 'bar-value' }, p.value.toFixed(1)));
+    });
+
+    if (opts.tableHeaders) makeDataTable(card, opts.tableHeaders, opts.tableRows);
+  }
+
+  /* ================= Data ================= */
+
+  var TONE = { accent: 'var(--accent)', ctx: 'var(--ctx-3)', ctx1: 'var(--ctx-1)', ctx2: 'var(--ctx-2)', ctx3: 'var(--ctx-3)' };
+
+  // ---- WebVoyager overall SR ----
+  var wvGpt = document.getElementById('chart-webvoyager');
+  renderBarPanel(wvGpt, {
+    title: 'WebVoyager — GPT-4-Turbo', sub: 'Overall success rate (%)', yMax: 70, yStep: 20,
+    ariaLabel: 'Bar chart of WebVoyager success rate on GPT-4-Turbo backbone; WebUncertainty highest at 65.9 percent',
+    bars: [
+      { label: 'WV-rep', value: 50.4, tone: 'ctx' },
+      { label: 'Browser Use', value: 51.9, tone: 'ctx' },
+      { label: 'Agent-E', value: 59.7, tone: 'ctx' },
+      { label: 'WebPilot', value: 62.0, tone: 'ctx' },
+      { label: 'AgentOccam', value: 64.3, tone: 'ctx' },
+      { label: 'Ours', value: 65.9, tone: 'accent' }
+    ],
+    tableHeaders: ['Agent', 'SR (%)'],
+    tableRows: [
+      { cells: ['WebVoyager-rep', '50.4'] }, { cells: ['Browser Use', '51.9'] }, { cells: ['Agent-E', '59.7'] },
+      { cells: ['WebPilot', '62.0'] }, { cells: ['AgentOccam', '64.3'] }, { cells: ['WebUncertainty', '65.9'], accent: true }
+    ]
+  });
+  renderBarPanel(wvGpt, {
+    title: 'WebVoyager — Qwen-Max', sub: 'Overall success rate (%)', yMax: 70, yStep: 20,
+    ariaLabel: 'Bar chart of WebVoyager success rate on Qwen-Max backbone; WebUncertainty highest at 63.6 percent',
+    bars: [
+      { label: 'WV-rep', value: 46.5, tone: 'ctx' },
+      { label: 'Browser Use', value: 48.8, tone: 'ctx' },
+      { label: 'Agent-E', value: 54.3, tone: 'ctx' },
+      { label: 'WebPilot', value: 55.8, tone: 'ctx' },
+      { label: 'AgentOccam', value: 58.9, tone: 'ctx' },
+      { label: 'Ours', value: 63.6, tone: 'accent' }
+    ],
+    tableHeaders: ['Agent', 'SR (%)'],
+    tableRows: [
+      { cells: ['WebVoyager-rep', '46.5'] }, { cells: ['Browser Use', '48.8'] }, { cells: ['Agent-E', '54.3'] },
+      { cells: ['WebPilot', '55.8'] }, { cells: ['AgentOccam', '58.9'] }, { cells: ['WebUncertainty', '63.6'], accent: true }
+    ]
+  });
+
+  // ---- Ablation ----
+  var abl = document.getElementById('chart-ablation');
+  renderBarPanel(abl, {
+    title: 'WebVoyager', sub: 'Success rate (%) by variant', yMax: 70, yStep: 20,
+    ariaLabel: 'Ablation bar chart on WebVoyager; full WebUncertainty highest at 63.6 percent, removing action uncertainty lowest at 54.3 percent',
+    bars: [
+      { label: 'w/o Action Unc.', value: 54.3, tone: 'ctx1' },
+      { label: 'w/o Task (Exp.)', value: 56.6, tone: 'ctx2' },
+      { label: 'w/o Task (Imp.)', value: 58.1, tone: 'ctx3' },
+      { label: 'Full (Ours)', value: 63.6, tone: 'accent' }
+    ],
+    tableHeaders: ['Variant', 'SR (%)'],
+    tableRows: [
+      { cells: ['w/o Action Uncertainty', '54.3'] }, { cells: ['w/o Task Uncertainty (Explicit-only)', '56.6'] },
+      { cells: ['w/o Task Uncertainty (Implicit-only)', '58.1'] }, { cells: ['Full WebUncertainty', '63.6'], accent: true }
+    ]
+  });
+  renderBarPanel(abl, {
+    title: 'WebArena', sub: 'Success rate (%) by variant', yMax: 50, yStep: 10,
+    ariaLabel: 'Ablation bar chart on WebArena; full WebUncertainty highest at 40.1 percent, removing action uncertainty lowest at 36.7 percent',
+    bars: [
+      { label: 'w/o Action Unc.', value: 36.7, tone: 'ctx1' },
+      { label: 'w/o Task (Exp.)', value: 39.2, tone: 'ctx2' },
+      { label: 'w/o Task (Imp.)', value: 38.2, tone: 'ctx3' },
+      { label: 'Full (Ours)', value: 40.1, tone: 'accent' }
+    ],
+    tableHeaders: ['Variant', 'SR (%)'],
+    tableRows: [
+      { cells: ['w/o Action Uncertainty', '36.7'] }, { cells: ['w/o Task Uncertainty (Explicit-only)', '39.2'] },
+      { cells: ['w/o Task Uncertainty (Implicit-only)', '38.2'] }, { cells: ['Full WebUncertainty', '40.1'], accent: true }
+    ]
+  });
+  var ablLegend = document.createElement('div');
+  ablLegend.className = 'legend';
+  ablLegend.style.marginTop = '4px';
+  makeLegend(abl.parentElement, [
+    { color: 'var(--ctx-1)', label: 'w/o Action Uncertainty' },
+    { color: 'var(--ctx-2)', label: 'w/o Task Uncertainty (explicit only)' },
+    { color: 'var(--ctx-3)', label: 'w/o Task Uncertainty (implicit only)' },
+    { color: 'var(--accent)', label: 'Full WebUncertainty' }
+  ]);
+
+  // ---- Efficiency scatter ----
+  var eff = document.getElementById('chart-efficiency');
+  renderScatterPanel(eff, {
+    title: 'Success rate vs. inference time', sub: 'Qwen-Max, WebVoyager — one point per method',
+    ariaLabel: 'Scatter plot of success rate versus average inference time per task; WebUncertainty reaches 63.6 percent in 351 seconds, higher and much faster than WebPilot at 55.8 percent in 804 seconds',
+    xDomain: [150, 850], yDomain: [40, 70], xTicks: [200, 400, 600, 800], yTicks: [40, 50, 60, 70],
+    points: [
+      { label: 'WebVoyager-rep', x: 204.9, y: 46.5, anchor: 'start', dy: 16 },
+      { label: 'Browser Use', x: 264.6, y: 48.8, anchor: 'start', dy: -8 },
+      { label: 'Agent-E', x: 224.7, y: 54.3, anchor: 'end', dy: -8 },
+      { label: 'WebPilot', x: 803.7, y: 55.8, anchor: 'end', dy: -10 },
+      { label: 'AgentOccam', x: 306.5, y: 58.9, anchor: 'start', dy: 4 },
+      { label: 'WebUncertainty (ours)', x: 351.4, y: 63.6, accent: true, anchor: 'start', dy: -12 }
+    ],
+    tableHeaders: ['Agent', 'SR (%)', 'Avg. time (s)'],
+    tableRows: [
+      { cells: ['WebVoyager-rep', '46.5', '204.9'] }, { cells: ['Browser Use', '48.8', '264.6'] },
+      { cells: ['Agent-E', '54.3', '224.7'] }, { cells: ['WebPilot', '55.8', '803.7'] },
+      { cells: ['AgentOccam', '58.9', '306.5'] }, { cells: ['WebUncertainty', '63.6', '351.4'], accent: true }
+    ]
+  });
+
+  // ---- Sensitivity ----
+  var sens = document.getElementById('chart-sensitivity');
+  renderLinePanel(sens, {
+    title: 'Planning switch threshold δ', sub: 'Success rate (%) vs. δ', xLabel: 'δ', yMax: 70, yStep: 20,
+    ariaLabel: 'Line chart of success rate versus delta threshold, peaking at delta equals 0.4 with 63.6 percent',
+    points: [
+      { x: '0.0', value: 58.1 }, { x: '0.2', value: 59.7 }, { x: '0.4', value: 63.6, peak: true },
+      { x: '0.6', value: 62.8 }, { x: '0.8', value: 58.9 }, { x: '1.0', value: 56.6 }
+    ],
+    tableHeaders: ['δ', 'SR (%)'],
+    tableRows: [
+      { cells: ['0.0', '58.1'] }, { cells: ['0.2', '59.7'] }, { cells: ['0.4', '63.6'], accent: true },
+      { cells: ['0.6', '62.8'] }, { cells: ['0.8', '58.9'] }, { cells: ['1.0', '56.6'] }
+    ]
+  });
+  renderLinePanel(sens, {
+    title: 'Evaluation threshold τ', sub: 'Success rate (%) vs. τ (of 10)', xLabel: 'τ', yMax: 70, yStep: 20,
+    ariaLabel: 'Line chart of success rate versus tau threshold, peaking at tau equals 6 with 63.6 percent and collapsing to 0 at tau equals 10',
+    points: [
+      { x: '0', value: 52.7 }, { x: '2', value: 57.4 }, { x: '4', value: 62.0 },
+      { x: '6', value: 63.6, peak: true }, { x: '8', value: 61.2 }, { x: '10', value: 0.0 }
+    ],
+    tableHeaders: ['τ', 'SR (%)'],
+    tableRows: [
+      { cells: ['0', '52.7'] }, { cells: ['2', '57.4'] }, { cells: ['4', '62.0'] },
+      { cells: ['6', '63.6'], accent: true }, { cells: ['8', '61.2'] }, { cells: ['10', '0.0'] }
+    ]
+  });
+})();
+</script>
+</body>
+</html>
